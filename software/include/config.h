@@ -15,8 +15,9 @@
  # define ROLL_PITCH_INPUT_MAX      4500            // roll, pitch input range
 #endif
 #ifndef YAW_INPUT_MAX
-# define YAW_INPUT_MAX				4500            // roll, pitch input range
+# define YAW_INPUT_MAX				4500           				//
 #endif
+
 #ifndef DEFAULT_ANGLE_MAX
  # define DEFAULT_ANGLE_MAX         4500            // ANGLE_MAX parameters default value
 #endif
@@ -122,14 +123,57 @@
 #endif
 
 #ifndef THR_MIN_DEFAULT													//最小的油门
- # define THR_MIN_DEFAULT       130             // minimum throttle sent to the motors when armed and pilot throttle above zero
+ # define THR_MIN_DEFAULT       170             // minimum throttle sent to the motors when armed and pilot throttle above zero
 #endif
 #ifndef THR_MAX_DEFAULT														
  # define THR_MAX_DEFAULT       1000            // maximum throttle sent to the motors
 #endif
 
 #ifndef THR_DZ_DEFAULT			//悬停时油门死区
-# define THR_DZ_DEFAULT         100             // the deadzone above and below mid throttle while in althold or loiter
+# define THR_DZ_DEFAULT         100 //不能为0, the deadzone above and below mid throttle while in althold or loiter
+#endif
+
+
+
+
+#ifndef ALT_HOLD_P
+# define ALT_HOLD_P            1.0f
+#endif
+
+// RATE control
+#ifndef THROTTLE_RATE_P
+# define THROTTLE_RATE_P       5.0f
+#endif
+
+// Throttle Accel control
+#ifndef THROTTLE_ACCEL_P
+# define THROTTLE_ACCEL_P      0.50f
+#endif
+#ifndef THROTTLE_ACCEL_I
+# define THROTTLE_ACCEL_I      1.00f
+#endif
+#ifndef THROTTLE_ACCEL_D
+# define THROTTLE_ACCEL_D      0.0f
+#endif
+#ifndef THROTTLE_ACCEL_IMAX
+# define THROTTLE_ACCEL_IMAX   800
+#endif
+
+// default maximum vertical velocity and acceleration the pilot may request
+#ifndef PILOT_VELZ_MAX
+# define PILOT_VELZ_MAX    250     // maximum vertical velocity in cm/s
+#endif
+#ifndef PILOT_ACCEL_Z_DEFAULT
+# define PILOT_ACCEL_Z_DEFAULT 250 // vertical acceleration in cm/s/s while altitude is under pilot control
+#endif
+
+// max distance in cm above or below current location that will be used for the alt target when transitioning to alt-hold mode
+#ifndef ALT_HOLD_INIT_MAX_OVERSHOOT
+# define ALT_HOLD_INIT_MAX_OVERSHOOT 200
+#endif
+// the acceleration used to define the distance-velocity curve
+#ifndef ALT_HOLD_ACCEL_MAX
+# define ALT_HOLD_ACCEL_MAX 250    // if you change this you must also update the duplicate declaration in AC_WPNav.h
 #endif
 
 
@@ -138,7 +182,7 @@
 // Throttle Failsafe
 //
 #ifndef FS_THR_VALUE_DEFAULT
-# define FS_THR_VALUE_DEFAULT       200	//SBUS，最小值只有350左右      975
+# define FS_THR_VALUE_DEFAULT       300+600	//SBUS，最小值只有350左右      975
 #endif
 
 

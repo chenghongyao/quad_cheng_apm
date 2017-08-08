@@ -239,15 +239,15 @@ void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_ang
 		
 		float linear_angle;
 		// sanity check smoothing gain
-		smoothing_gain = constrain_float(smoothing_gain, 1.0f, 50.0f);		//平滑增益限幅 1-50,也大响应越灵敏????
+		smoothing_gain = constrain_float(smoothing_gain, 1.0f, 50.0f);					//平滑增益限幅 1-50,也大响应越灵敏????
 		linear_angle = atti_ctrl.accel_rp_max / (smoothing_gain*smoothing_gain);//旋转加速度限制,gain越大,速度限制越小??
-		rate_change_limit = atti_ctrl.accel_rp_max * atti_ctrl.dt;//最大角速度该变量,0???
-		
+		rate_change_limit = atti_ctrl.accel_rp_max * atti_ctrl.dt;							//最大角速度该变量,0???
+
 		///////////////////////////////////////////////////////////
 		angle_to_target = roll_angle_ef - atti_ctrl.angle_ef_target.x;	//期望角度改变量
 		//根据角度误差得到期望速度作为前馈？
-		if (angle_to_target > linear_angle)			//????
-		{							//该变量过大??
+		if (angle_to_target > linear_angle)			//????	//该变量过大??
+		{						
 			rate_ef_desired = safe_sqrt(2.0f*atti_ctrl.accel_rp_max*((float)fabs(angle_to_target) - (linear_angle / 2.0f)));
 		}
 		else if (angle_to_target < -linear_angle) 
@@ -287,8 +287,8 @@ void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_ang
 	else //没有最大加速度限制，直接求误差，前馈置0
 	{
 		// target roll and pitch to desired input roll and pitch
-		atti_ctrl.angle_ef_target.x = roll_angle_ef;		//直接给期望角度,为何不先限幅??外部限幅了??
-		angle_ef_error.x = wrap_180_cd_float(atti_ctrl.angle_ef_target.x - ahrs.roll_sensor);//roll角度误差
+		atti_ctrl.angle_ef_target.x = roll_angle_ef;																					//直接给期望角度,为何不先限幅??外部限幅了??
+		angle_ef_error.x = wrap_180_cd_float(atti_ctrl.angle_ef_target.x - ahrs.roll_sensor); //roll角度误差
 
 		atti_ctrl.angle_ef_target.y = pitch_angle_ef;
 		angle_ef_error.y = wrap_180_cd_float(atti_ctrl.angle_ef_target.y - ahrs.pitch_sensor);
@@ -297,11 +297,13 @@ void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_ang
 		atti_ctrl.rate_ef_desired.x = 0;
 		atti_ctrl.rate_ef_desired.y = 0;
 	}
+	
 	// constrain earth-frame angle targets
-	//期望角度限幅，处理完再限幅有什么用？？
+	//期望角度限幅，去掉误差再限幅有什么用？？
 	atti_ctrl.angle_ef_target.x = constrain_float(atti_ctrl.angle_ef_target.x, -g.angle_max, g.angle_max);
 	atti_ctrl.angle_ef_target.y = constrain_float(atti_ctrl.angle_ef_target.y, -g.angle_max, g.angle_max);
 
+	//yaw计算
 	if (atti_ctrl.accel_y_max > 0.0f)
 	{//有最大旋转加速度限制
 		float rate_change;
@@ -319,18 +321,18 @@ void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_ang
 	{	//没有最大旋转加速度限制
 		// set yaw feed forward to zero
 		atti_ctrl.rate_ef_desired.z = yaw_rate_ef;		//期望方向速度?
-		//计算角度误差,限制最大误差，最大10度
+		//用期望速率计算角度误差,限制最大误差，最大10度
 		update_ef_yaw_angle_and_error(atti_ctrl.rate_ef_desired.z, &angle_ef_error, AC_ATTITUDE_RATE_STAB_YAW_OVERSHOOT_ANGLE_MAX);
 	}
 
 	// convert earth-frame angle errors to body-frame angle errors
 	frame_conversion_ef_to_bf(&angle_ef_error, &atti_ctrl.angle_bf_error);	//角度误差转到body
 	// convert body-frame angle errors to body-frame rate targets
-	update_rate_bf_targets();//angle_bf_error->rate_bf_target,P控制
+	update_rate_bf_targets();//angle_bf_error->rate_bf_target,P控制					//简单P控制得到body的期望速率并限幅
 
 
 	// add body frame rate feed forward,rate_ef_desired???
-	if (atti_ctrl.rate_bf_ff_enabled) 
+	if (atti_ctrl.rate_bf_ff_enabled) //前馈
 	{
 		// convert earth-frame feed forward rates to body-frame feed forward rates
 		frame_conversion_ef_to_bf(&atti_ctrl.rate_ef_desired, &atti_ctrl.rate_bf_desired);
@@ -342,11 +344,21 @@ void angle_ef_roll_pitch_rate_ef_yaw_smooth(float roll_angle_ef, float pitch_ang
 		atti_ctrl.rate_ef_desired.y = 0;
 		//convert earth-frame feed forward rates to body-frame feed forward rates
 		frame_conversion_ef_to_bf(&atti_ctrl.rate_ef_desired, &atti_ctrl.rate_bf_desired);
-		vector3f_add(&atti_ctrl.rate_bf_target, &atti_ctrl.rate_bf_desired, NULL);			//前馈??
+		vector3f_add(&atti_ctrl.rate_bf_target, &atti_ctrl.rate_bf_desired, NULL);			//yaw需要进行前馈
 	}
 
 }
 
+
+void attitude_control_set_dt(float delta_sec)
+{
+	atti_ctrl.dt = delta_sec;
+		
+	acpid_set_d_alpha(atti_ctrl.pid_rate_roll,AC_ATTITUDE_RATE_RP_PID_DTERM_FILTER,delta_sec);
+	acpid_set_d_alpha(atti_ctrl.pid_rate_pitch,AC_ATTITUDE_RATE_RP_PID_DTERM_FILTER,delta_sec);
+	acpid_set_d_alpha(atti_ctrl.pid_rate_yaw,AC_ATTITUDE_RATE_RP_PID_DTERM_FILTER,delta_sec);
+	
+}
 
 void attitude_control_init()
 {
@@ -358,16 +370,17 @@ void attitude_control_init()
 	atti_ctrl.pid_rate_pitch = &g.pid_rate_pitch;
 	atti_ctrl.pid_rate_yaw = &g.pid_rate_yaw;
 
-	atti_ctrl.flags.limit_angle_to_rate_request = 1;				//期望速率限幅
+	atti_ctrl.flags.limit_angle_to_rate_request = 1;						//1,期望速率限幅
 	atti_ctrl.angle_rate_rp_max = AC_ATTITUDE_CONTROL_RATE_RP_MAX_DEFAULT;
 	atti_ctrl.angle_rate_y_max = AC_ATTITUDE_CONTROL_RATE_Y_MAX_DEFAULT;	
 
 	//用于前馈控制
 	atti_ctrl.accel_rp_max = AC_ATTITUDE_CONTROL_ACCEL_RP_MAX_DEFAULT;
 	atti_ctrl.accel_y_max = AC_ATTITUDE_CONTROL_ACCEL_Y_MAX_DEFAULT;
-	atti_ctrl.rate_bf_ff_enabled = AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT;	//0
+	atti_ctrl.rate_bf_ff_enabled = AC_ATTITUDE_CONTROL_RATE_BF_FF_DEFAULT;	//0,关闭前馈
 
-	atti_ctrl.dt = MAIN_LOOP_SECONDS;			//10ms
+	attitude_control_set_dt(MAIN_LOOP_SECONDS);			//10ms
+	
 }
 
 

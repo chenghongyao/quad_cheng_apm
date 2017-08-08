@@ -327,8 +327,8 @@ void ahrs_dcm_update_cd_values(void)
 	ahrs.roll_sensor  = degrees(ahrs.roll) * 100;
     ahrs.pitch_sensor = degrees(ahrs.pitch) * 100;
     ahrs.yaw_sensor   = degrees(ahrs.yaw) * 100;
-//    if (ahrs.yaw_sensor < 0)		
-//        ahrs.yaw_sensor += 36000;
+   if (ahrs.yaw_sensor < 0)		
+       ahrs.yaw_sensor += 36000;
 }
 
 void ahrs_dcm_euler_angles(void)
@@ -379,9 +379,9 @@ void ahrs_dcm_update(void)
     // if the update call took more than 0.2 seconds then discard it,
     // otherwise we may move too far. This happens when arming motors 
     // in ArduCopter
-    if (delta_t > 0.2f) //200ms，时间太长，不处理
-		{		
-				vector3f_zero(&ahrs.ra_sum);			//gps用？？
+   if (delta_t > 0.2f) //200ms，时间太长，不处理
+	{		
+		vector3f_zero(&ahrs.ra_sum);			//gps用？？
         ahrs.ra_deltat = 0;
         return;
     }
@@ -402,7 +402,7 @@ void ahrs_dcm_update(void)
     ahrs_dcm_euler_angles();							//计算欧拉角 ,roll,pitch,yaw,xx_sensor
 
     // update trig values including _cos_roll, cos_pitch
-    ahrs_dcm_update_trig();		//计算6个欧拉角三角函数值以方便后面计算*/
+    ahrs_dcm_update_trig();							//计算6个欧拉角三角函数值以方便后面计算*/
 
 }
 

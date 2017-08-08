@@ -15,9 +15,10 @@
 //=======================================================================
 
 void mpu6050_init(void);			//MPU初始化
-void mpu6050_getGyroAdc(int16_t *gyroadc);
-void mpu6050_getAccAdc(int16_t *accadc);
+uint8_t mpu6050_getGyroAdc(int16_t *gyroadc);
+uint8_t mpu6050_getAccAdc(int16_t *accadc);
 void mpu6050_getAccel(float *acc);
 void mpu6050_getGyro(float *gyro);
+uint8_t mpu6050_getAdcAll(int16_t *accadc,int16_t *gyroadc);
 #endif
 

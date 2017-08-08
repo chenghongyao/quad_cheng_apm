@@ -27,9 +27,15 @@ typedef struct
 extern ms5611_t mMS5611;
 
 void ms5611_init(void);
-uint8_t ms5611_update(void);
+void ms5611_reset(void);
+void ms5611_update(void);
 float ms5611_getAltitude(void);
-
+void ms5611_readPROM(uint16_t *C1, uint16_t *C2, uint16_t *C3, uint16_t *C4, uint16_t *C5, uint16_t *C6);
+//void ms5611_readPROM(void);
+void ms5611_start_T(void);
+void ms5611_start_P(void);
+uint32_t ms5611_read_Adc_T(void);
+uint32_t ms5611_read_Adc_P(void);
 
 
 

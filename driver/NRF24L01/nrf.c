@@ -1,17 +1,6 @@
 #include "nrf_dev.h"
 #include "nrf.h"
 
-
-
-//#include "delay.h"
-//#include "spi.h"
-//#include "led.h"
-//#include "usart.h"
-
-
-
-
-
 static u8 f_tx_wait = 0;
 static u8 rf_setup;
 static u8 packet_size=32;
@@ -21,10 +10,9 @@ static u8 rfpower = NRF_POWER_0dB;
 static u8 txrx_address[5] = { 'w', 'e', 'i', 'c', 'h' };  //发送地址
 
 
-#ifdef NRF_ACKPAY_ENABLE
 u8 nrf_ackbuf[32];
 u8 nrf_acklen=0;
-#endif
+
 
 
 
@@ -37,16 +25,12 @@ void nrf24l01_init()
 	nrf24l01_setTxAddr(txrx_address,5);							//发送地址	
 	nrf24l01_setRxAddr(RX_ADDR_P0,txrx_address,5);	//通道0接收地址
 	nrf24l01_enaleRxAddr(NRF_P0);									//使能通道0	
-#ifdef NRF_ACKPAY_ENABLE
 	nrf24l01_enableAck(NRF_P0,1);								
 	nrf24l01_setRetry(10,1);
 	//使能动态数据宽度,应答包
 	nrf24l01_setFeature(NRF_EN_DPL|NRF_EN_ACK_PAY);
 	nrf24l01_enableDyn(NRF_P0);	
-#else
-	nrf24l01_enableAck(NRF_P0,0);
-	nrf24l01_setRxPW(RX_PW_P0,packet_size);			//数据宽度,必须与发送一致
-#endif
+
 	
 	nrf24l01_setBitrate(bitrate);									
 	nrf24l01_setPower(rfpower);									
@@ -306,8 +290,10 @@ void nrf24l01_sendAckPacket(u8 *buf,u8 len)
 //32字节
 u8 nrf24l01_sendPacket(void *txbuf,u8 len)
 {
-	u8 sta;
+	u8 sta ;
 	nrf24l01_writePayload(txbuf,len);//写数据到TX BUF 32 个字节
+	
+	
 	while(NRF_IRQ == 1); 				//等待发送完成
 	sta=nrf24l01_readReg(STATUS); //读取状态寄存器的值 
 	nrf24l01_writeReg(STATUS,sta); //清除 TX_DS 或MAX_RT 中断标志
@@ -342,7 +328,7 @@ u8 nrf24l01_sendPacket2(void *txbuf,u8 len)
 		while(NRF_IRQ == 1); 				//等待发送完成
 		sta=nrf24l01_readReg(STATUS); //读取状态寄存器的值 
 		nrf24l01_writeReg(STATUS,sta); //清除 TX_DS 或MAX_RT 中断标志
-#ifdef NRF_ACKPAY_ENABLE
+
 		if(sta&RX_OK)//发送完成
 		{
 			nrf_acklen = nrf24l01_getDynamicPayloadSize();
@@ -354,12 +340,47 @@ u8 nrf24l01_sendPacket2(void *txbuf,u8 len)
 			nrf24l01_FlushTx();
 			return MAX_TX;
 		}
-#endif
 	}
 	
 	nrf24l01_writePayload(txbuf,len);//写数据到TX BUF 32 个字节
 	f_tx_wait = 1;
 	return 0xff;//其他原因发送失败
+}
+
+//32字节
+//1,发送成功,0,等待发送
+u8 nrf24l01_sendPacket3(void *txbuf,u8 len)
+{
+	u8 sta;
+	static uint32_t tPre = 0;
+	if(NRF_IRQ == 1)	//发送未完成或没有设置发送
+	{
+		if(micros()-tPre<10000)	//10ms
+		{
+			return 0;					//未发送完成
+		}
+		//超时则直接发送下一包
+		nrf24l01_clearStatus();
+		nrf24l01_FlushTx();
+	}
+	else		//发送完成
+	{
+			nrf24l01_clearStatus();
+		#ifdef NRF_ACKPAY_ENABLE
+			if(sta&RX_OK)//发送完成
+			{
+				nrf_acklen = nrf24l01_getDynamicPayloadSize();
+				nrf24l01_readPayload(nrf_ackbuf,nrf_acklen);//读取数据	
+			}
+			else if(sta&MAX_TX) //达到最大重发次数,当作发送完成
+			{
+				nrf24l01_FlushTx();
+			}
+		#endif
+	}
+	nrf24l01_writePayload(txbuf,len);//写数据到TX BUF 32 个字节
+	tPre = micros();									//记录发送时间
+	return 1;												//写入成功
 }
 
 
@@ -369,7 +390,6 @@ u8 nrf24l01_recvPacket(void *rxbuf)
 {
 	if(!NRF_IRQ)
 	{
-#ifdef NRF_ACKPAY_ENABLE
 		u8 rxlen;	
 		rxlen = nrf24l01_getDynamicPayloadSize();
 		if(rxlen>0)
@@ -378,11 +398,7 @@ u8 nrf24l01_recvPacket(void *rxbuf)
 			nrf24l01_clearStatus();		
 			return rxlen;
 		}
-#else
-		nrf24l01_readPayload(rxbuf,packet_size);//读取数据	
-		nrf24l01_clearStatus();
-		return packet_size;
-#endif
+
 		
 	}
 	return 0;//没收到任何数据	

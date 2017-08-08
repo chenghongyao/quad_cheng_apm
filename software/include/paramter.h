@@ -55,9 +55,13 @@ typedef struct
 	acpid_t p_stabilize_pitch;
 	acpid_t p_stabilize_yaw;
 
-	acpid_t p_alt_hold;
-	acpid_t p_throttle_rate;
-	acpid_t pid_throttle_accel;
+	acpid_t p_alt_pos;
+	acpid_t p_alt_rate;
+	acpid_t pid_alt_accel;
+	
+	
+	//Alt hold
+	int16_t pilot_velocity_z_max;		//z轴最大速度,cm??	
 
 	
 

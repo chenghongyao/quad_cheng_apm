@@ -1,28 +1,35 @@
 #include "AttitudeControl.h"
 #include "AP_Motor.h"
 #include "AP_InertialSensor.h"
-#include "paramter.h"
 #include "Scheduler.h"
 #include "AP_State.h"
 #include "Compass.h"
+#include "InertialNav.h"
+#include "PosControl.h"
+
+#include "paramter.h"
 #include "stabilize.h"
 #include "radio.h"
-
 #include "notify.h"
 #include "ano.h"
 #include "sbus.h"
+#include "barometer.h"
+#include "inertia.h"
 
-
-
-attitude_control_t atti_ctrl;
-ahrs_dcm_t ahrs;
-apmotor_t apmotor;
 inertial_sensor_t ins;
+InertialNav_t inav;
+ahrs_dcm_t ahrs;
+attitude_control_t atti_ctrl;
+pos_control_t pos_ctrl;
+
+barometer_t barometer;
+
+
+apmotor_t apmotor;
 paramter_t g;
 copter_t ap;	
 failsafe_t failsafe;
 Compass_t compass;
-
 
 
 
@@ -34,11 +41,22 @@ float simple_sin_yaw;							//无头模式下记录起飞角度
 int32_t super_simple_last_bearing;	// init_arm_motors中初始化为当前yaw+180度(解锁动作调用)
 float super_simple_cos_yaw = 1.0;
 float super_simple_sin_yaw;			//super_simple模式，不用
+int16_t desired_climb_rate;
+
+
+//
+float G_Dt;
 
 
 
 //
-static float G_Dt;
+////////////////////////////////////////////////////////////////////////////////
+// Throttle variables
+////////////////////////////////////////////////////////////////////////////////
+//static float throttle_avg;     // g.throttle_cruise as a float
+int16_t desired_climb_rate;    //调试用,期望爬升速率,rc_throttle.control_in对最高期望速率归一化
+
+
 // System Timers
 // --------------
 static uint32_t fast_loopTimer;		//最近一次进入loop的时间
@@ -50,12 +68,15 @@ static uint16_t mainLoop_count;		//loop运行计数
 //// The cm/s we are moving up or down based on filtered data - Positive = UP
 //static int16_t climb_rate = 0;				//爬升速率,velocity.z
 //// The altitude as reported by Sonar in cm - Values are 20 to 700 generally.
-//static int16_t sonar_alt;
-//static uint8_t sonar_alt_health;    // true if we can trust the altitude from the sonar
-//static float target_sonar_alt;      // desired altitude in cm above the ground
 
-//static int32_t baro_alt;            // barometer altitude in cm above home
-//static float baro_climbrate;        // barometer climbrate in cm/s
+int16_t sonar_alt;
+uint8_t sonar_alt_health;    // true if we can trust the altitude from the sonar
+float target_sonar_alt;      // desired altitude in cm above the ground
+
+int32_t baro_alt;            // barometer altitude in cm above home
+float baro_climbrate;        // barometer climbrate in cm/s
+
+
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +88,8 @@ void throttle_loop(void);
 void arm_motors_check(void);
 void update_notify(void);
 void one_hz_loop(void);
+void update_altitude(void);
+void run_nav_updates(void);
 ///////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -86,20 +109,18 @@ microseconds)
 */
 static scheduler_tasks_t scheduler_tasks[] =
 {
-	{rc_loop,					1,				100},		//100Hz,读取遥控信号
-	{arm_motors_check, 	10,     10 },		//10Hz,上锁,解锁动作检测,10Hz
-	{update_notify,			2,			100},		//50Hz,更新灯
+	{rc_loop,					1,			100},		//100Hz,读取遥控信号
+	{arm_motors_check, 			10,			10 },		//10Hz,上锁,解锁动作检测,10Hz
+	{update_notify,				2,			100},		//50Hz,更新灯
 	{one_hz_loop,				100,		420},		//pre_arm_checks
+	{update_altitude,			10,			1000 },		//更新高度10Hz,100ms??(读取气压计,超声波)
 };
-
-
-
-
 
 void setup()
 {
 	param_setup_and_load();		//加载系统参数
-	
+
+	//电调校准
 	if(g.esc_calibrate)
 	{
 		while(1)
@@ -114,66 +135,64 @@ void setup()
 					motor_write(i,periods[2]);	//油门通道
 				}
 			}
-			
 		}
-		
 	}
-	
-	scheduler_init(scheduler_tasks,sizeof(scheduler_tasks)/sizeof(scheduler_tasks[0]));				//定时器??
+	scheduler_init(scheduler_tasks,sizeof(scheduler_tasks)/sizeof(scheduler_tasks[0]));				
 	notify.flags.initialising = 1;
 	inertial_sensor_init();
 	ahrs_dcm_init();
-	//Compass_init();
 	apmotor_init(&g.rc_1,&g.rc_2,&g.rc_3,&g.rc_4);
-	attitude_control_init();
+	barometer_init();
 	
+	attitude_control_init();
+	pos_control_init();
+	InertialNav_init();
+
 	init_rc_in();
 	init_rc_out();
-	
-	
-	read_radio();
-	
 
-	
 	notify.flags .initialising = 0;
-	
+	//printf("ready");
 }
 
 
-
+extern uint32_t ms5611_d1;
+//extern float ms5611_temperature;				//温度
+//extern float ms5611_pressure;				//温度
 extern uint16_t motor_monitor[4];
+extern float hist_base,hist_push;
 void loop()
 {
 	uint32_t timer;
 	uint32_t time_available;
-	
 	inertial_sensor_wait_for_sample();			
 	timer = micros();	
 	// used by PI Loops
 	G_Dt                    = (float)(timer - fast_loopTimer) / 1000000.f;		//调用周期
 	fast_loopTimer          = timer;
-
 	// for mainloop failure monitoring
 	mainLoop_count++;		
-
 	// Execute the fast loop
 	// ---------------------
 	fast_loop();
+	
 	//ANO_DT_Send_MotoPWM(motor_monitor[0],motor_monitor[1],motor_monitor[2],motor_monitor[3],0,0,0,0);
 	//ANO_DT_Send_Sensor(apmotor.rc_roll->servo_out,apmotor.rc_pitch->servo_out,apmotor.rc_yaw->servo_out,apmotor.rc_throttle->servo_out,0,0,0,0,0);
-
-	//ANO_DT_Send_Sensor(atti_ctrl.rate_bf_target.x,ahrs.omega.x*AC_ATTITUDE_CONTROL_DEGX100,apmotor.rc_roll->servo_out,apmotor.rc_throttle->servo_out,0,0,0,0,0);
+//	ANO_DT_Send_Sensor(barometer.Temp,barometer.Press,baro_alt ,apmotor.rc_roll->servo_out,apmotor.rc_throttle->servo_out,0,0,0,0);
 	//ANO_DT_Send_Sensor((float)g.rc_1.control_in,(float)g.rc_2.control_in,(float)g.rc_4.control_in,g.rc_3.control_in,0,0,0,0,0);
 	//ANO_DT_Send_Sensor(ins.accel.x*100,ins.accel.y*100,ins.accel.z*100,ins.gyro.x*100,ins.gyro.y*100,ins.gyro.z*100,0,0,0);
 	//ANO_DT_Send_Sensor(ahrs.omega_P.x*1000,ahrs.omega_P.y*1000,ahrs.omega_P.z*1000,0,0,0 ,0,0,0);
 	//ANO_DT_Send_Sensor(ahrs.omega_P.x*1000,ahrs.omega_P.y*1000,ahrs.omega_P.z*1000,ahrs.err_len*1000,0,0 ,0,0,0);
-	//ANO_DT_Send_Status((float)ahrs.roll_sensor/100,(float)ahrs.pitch_sensor/100,ahrs.yaw_sensor/100,0,0,0);
+	//ANO_DT_Send_Status((float)ahrs.roll_sensor/100,(float)ahrs.pitch_sensor/100,ahrs.yaw_sensor/100,0,0,0);				//2ms?
 	// tell the scheduler one tick has passed
 	//ANO_DT_Send_Status((float)g.rc_1.control_in/100,(float)g.rc_2.control_in/100,(float)g.rc_4.control_in/100,g.rc_3.control_in,0,0);
+	ANO_DT_Send_Sensor(inav.velocity.z,inav.position.z,barometer.altitude ,inav.position_error.z,hist_base,hist_push, 0, 0, 0);
+	
 	scheduler_tick();	
 	time_available = (timer + MAIN_LOOP_MICROS) - micros();//运行10ms
 	scheduler_run(time_available);
 }
+
 
 
 
@@ -183,8 +202,11 @@ void fast_loop()
 	read_AHRS();		//--
 	rate_controller_run();		//!速率控制
 	set_servos_4();						//
-	stabilize_run();		//姿态 control_in -> rate_bf_target,油门 control_in -> servo_out
+	read_inertia();					//更新_velocity,_position 
+	stabilize_run();				//姿态 control_in -> rate_bf_target,油门 control_in -> servo_out
 }
+
+
 
 
 static void read_AHRS()
@@ -202,14 +224,15 @@ static void set_servos_4()
 void rc_loop()//100Hz
 {
 	read_radio();
+
 }
+
 
 //10Hz，解锁，上锁动作检测？？？？？？？
 void arm_motors_check(void)
 {
 	static int16_t arming_counter = 0;
 	int16_t tmp;
-	
 	if (g.rc_3.control_in > 0)		//油门非0，直接退出
 	{
 		arming_counter = 0;
@@ -262,76 +285,92 @@ void arm_motors_check(void)
 
 void init_simple_bearing()
 {
-		initial_armed_bearing = ahrs.yaw_sensor;
-    // capture current cos_yaw and sin_yaw values
-    simple_cos_yaw = ahrs.cos_yaw; //当前的方向
-    simple_sin_yaw = ahrs.sin_yaw;
+	initial_armed_bearing = ahrs.yaw_sensor;
+	// capture current cos_yaw and sin_yaw values
+	simple_cos_yaw = ahrs.cos_yaw; //当前的方向
+	simple_sin_yaw = ahrs.sin_yaw;
 
-    // initialise super simple heading (i.e. heading towards home) to be 180 deg from simple mode heading
-    super_simple_last_bearing = wrap_360_cd(ahrs.yaw_sensor+18000);		//当前方向加180度??
-    super_simple_cos_yaw = simple_cos_yaw;		
-    super_simple_sin_yaw = simple_sin_yaw;
+	// initialise super simple heading (i.e. heading towards home) to be 180 deg from simple mode heading
+	super_simple_last_bearing = wrap_360_cd(ahrs.yaw_sensor+18000);		//当前方向加180度??
+	super_simple_cos_yaw = simple_cos_yaw;		
+	super_simple_sin_yaw = simple_sin_yaw;
 
 }
+
 
 // update_auto_armed - update status of auto_armed flag
-static void update_auto_armed()
-{
-	// disarm checks
-	if (ap.flags.auto_armed)
-	{		//允许自动解锁
-		// if motors are disarmed, auto_armed should also be false
-		if (!apmotor.flags.armed) 				//一旦上锁，就关闭自动解锁
-			{			//上锁了
-				set_auto_armed(0);		//关闭自动解锁
-				return;
-			}
-			//还未上锁，如果，如果油门时0，也关闭自动解锁
-		// if in stabilize or acro flight mode and throttle is zero, auto-armed should become false
-		//没有上锁,子自稳和特技模式下，如果油门时0，就关闭自动解锁
-		if (ap.flags.throttle_zero && !failsafe.radio) 
-		{//自稳和特技模式且如果信号没有丢失且???关闭自动解锁
-			set_auto_armed(0);
-		}
+// static void update_auto_armed()
+// {
+// 	// disarm checks
+// 	if (ap.flags.auto_armed)
+// 	{		//允许自动解锁
+// 		// if motors are disarmed, auto_armed should also be false
+// 		if (!apmotor.flags.armed) 				//一旦上锁，就关闭自动解锁
+// 			{			//上锁了
+// 				set_auto_armed(0);		//关闭自动解锁
+// 				return;
+// 			}
+// 			//还未上锁，如果，如果油门时0，也关闭自动解锁
+// 		// if in stabilize or acro flight mode and throttle is zero, auto-armed should become false
+// 		//没有上锁,子自稳和特技模式下，如果油门时0，就关闭自动解锁
+// 		if (ap.flags.throttle_zero && !failsafe.radio) 
+// 		{//自稳和特技模式且如果信号没有丢失且???关闭自动解锁
+// 			set_auto_armed(0);
+// 		}
+// 
+// 	}
+// 	else
+// 		{	//不允许自动解锁??
+// 		// arm checks
+// 		// if motors are armed and throttle is above zero auto_armed should be true
+// 		if (apmotor.flags.armed && !ap.flags.throttle_zero) //解锁了且油门非0;
+// 		{
+// 			set_auto_armed(1);//解锁了且油门非0,使能自动解锁
+// 		}
+// 
+// 	}
+// }
 
-	}
-	else
-		{	//不允许自动解锁??
-		// arm checks
-		// if motors are armed and throttle is above zero auto_armed should be true
-		if (apmotor.flags.armed && !ap.flags.throttle_zero) //解锁了且油门非0;
-		{
-			set_auto_armed(1);//解锁了且油门非0,使能自动解锁
-		}
+// 50Hz
+// void throttle_loop()
+// {
+// 	update_auto_armed();		//?????
+// 
+// }
 
-	}
-}
 
-//50Hz
-void throttle_loop()
-{
-	update_auto_armed();		//?????
-
-}
 void update_notify(void)
 {
 	notify_update();
 }
+
+
+
+void update_baro_altitude()
+{
+	barometer_read();//处理气压,温度->Temp,Press
+	baro_alt = barometer_get_altitude();
+	baro_climbrate = barometer_get_climbrate()*100.0f;
+}
+
+//更新气压高度,速率,超声波高度
+void update_altitude()
+{
+	update_baro_altitude();
+}
+
 void one_hz_loop(void)
 {
  // perform pre-arm checks & display failures every 30 seconds
     static uint8_t pre_arm_display_counter = 15;
-	
-	
     pre_arm_display_counter++;
     if (pre_arm_display_counter >= 5) 
 		{	
-			pre_arm_checks(1);				//所有传感器自检
+			pre_arm_checks(1);				//
 			pre_arm_display_counter = 0;
     }
 		else
 		{
       pre_arm_checks(1);
     }
-
 }

@@ -78,3 +78,9 @@ void acpid_set(acpid_t *pid, float kp, float ki, float kd, float imax)
 	pid->d_lpf_alpha = AC_PID_D_TERM_FILTER;		//fs = 100Hz , fc = 20Hz
 }
 
+void acpid_set_d_alpha(acpid_t *pid,int16_t cutoff_frequency, float time_step)
+{
+	  // calculate alpha
+    float rc = 1/(2*MY_PI*cutoff_frequency);
+    pid->d_lpf_alpha = time_step / (time_step + rc);
+}

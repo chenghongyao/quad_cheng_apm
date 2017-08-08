@@ -70,7 +70,8 @@ void param_setup_and_load()
 	acpid_set(&g.pid_rate_pitch, RATE_PITCH_P, RATE_PITCH_I, RATE_PITCH_D, RATE_PITCH_IMAX);
 	acpid_set(&g.pid_rate_yaw, RATE_YAW_P, RATE_YAW_I, RATE_YAW_D, RATE_YAW_IMAX);
 
-
+	//定高PID
+	acpid_set(&g.p_alt_pos, ALT_HOLD_P, 0, 0, 0);	//default = 1.0
 
 
 	//g,其他
@@ -79,6 +80,10 @@ void param_setup_and_load()
 	g.arming_check = ARMING_CHECK_ALL;		//解锁时检测使能
 	g.rc_feel_rp = RC_FEEL_RP_VERY_CRISP;	//100
 	g.esc_calibrate = 0;
+	//定高参数
+	g.pilot_velocity_z_max = PILOT_VELZ_MAX;
+
+
 	
 	//ap////////////////////////////////////////////
 	ap.flags.pre_arm_check = 0;		//

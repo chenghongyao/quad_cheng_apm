@@ -32,8 +32,8 @@ static uint8_t ano_txindex=4;
 void ANO_DT_Send_Data(uint8_t *dataToSend , uint8_t length)
 {
 //	tcp_send(0,dataToSend,length);
-	myputbuf(ano_txbuffer,length);
-	//nrf24l01_sendPacket(dataToSend,length);
+	//myputbuf(ano_txbuffer,length);
+	nrf24l01_sendPacket3(dataToSend,length);
 		//nrf24l01_sendAckPacket(dataToSend,length);
 }
 

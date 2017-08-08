@@ -44,7 +44,7 @@ typedef struct
 
 
 
-	vector3f_t            angle_ef_target;       // angle controller earth-frame targets
+	vector3f_t            angle_ef_target;       // angle controller earth-frame targets,期望角度
 	vector3f_t            rate_bf_target;        // rate controller body-frame targets
 	
 	vector3f_t            angle_bf_error;        // angle controller body-frame error

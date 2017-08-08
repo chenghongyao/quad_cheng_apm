@@ -454,6 +454,11 @@
               <FileType>1</FileType>
               <FilePath>.\driver\mpu6050\mpu6050.c</FilePath>
             </File>
+            <File>
+              <FileName>ms5611.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\driver\ms5611\ms5611.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -573,6 +578,46 @@
               <FileName>notify.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\software\src\notify.c</FilePath>
+            </File>
+            <File>
+              <FileName>Attitude.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\Attitude.c</FilePath>
+            </File>
+            <File>
+              <FileName>InertialNav.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\InertialNav.c</FilePath>
+            </File>
+            <File>
+              <FileName>PosControl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\PosControl.c</FilePath>
+            </File>
+            <File>
+              <FileName>althold.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\althold.c</FilePath>
+            </File>
+            <File>
+              <FileName>LowPassFilter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\LowPassFilter.c</FilePath>
+            </File>
+            <File>
+              <FileName>barometer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\barometer.c</FilePath>
+            </File>
+            <File>
+              <FileName>inertia.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\inertia.c</FilePath>
+            </File>
+            <File>
+              <FileName>AP_Buffer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\software\src\AP_Buffer.c</FilePath>
             </File>
           </Files>
         </Group>

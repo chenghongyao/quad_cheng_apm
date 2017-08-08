@@ -1,7 +1,7 @@
 #ifndef _AC_PID_H_
 #define _AC_PID_H_
 
-
+#include "sys.h"
 
 
 #define AC_PID_D_TERM_FILTER 0.556864f    // Default 100Hz Filter Rate with 20Hz Cutoff Frequency
@@ -28,7 +28,7 @@ float acpid_get_integrator(acpid_t *pid);
 
 void acpid_reset(acpid_t *pid);
 void acpid_set(acpid_t *pid,float kp,float ki,float kd,float imax);
-
+void acpid_set_d_alpha(acpid_t *pid,int16_t cutoff_frequency, float time_step);
 #endif
 
 

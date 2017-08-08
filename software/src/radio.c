@@ -121,14 +121,12 @@ void init_rc_in()
 	rc_set_angle(apmotor.rc_roll, ROLL_PITCH_INPUT_MAX);		//rc.high
 	rc_set_angle(apmotor.rc_pitch, ROLL_PITCH_INPUT_MAX);
 	rc_set_range(apmotor.rc_throttle, g.throttle_min, g.throttle_max);//rc.low,low_out,high,high_out输出最小最大油门
-	rc_set_angle(apmotor.rc_yaw, YAW_INPUT_MAX);		//45度/s
+	rc_set_angle(apmotor.rc_yaw, YAW_INPUT_MAX);											//45度/s
 
 	rc_set_type(apmotor.rc_roll, RC_CHANNEL_TYPE_ANGLE_RAW);
 	rc_set_type(apmotor.rc_pitch, RC_CHANNEL_TYPE_ANGLE_RAW);
 	rc_set_type(apmotor.rc_yaw, RC_CHANNEL_TYPE_ANGLE_RAW);
-
 	//default_dead_zones();		//paramater中设置
-
 	ap.flags.throttle_zero = 1;
 }
 
@@ -182,7 +180,7 @@ void read_radio(void)
 		rc_set_pwm(&g.rc_2, periods[1]);		//pitch,PWM转为期望角度radio_in -> control_in
 		rc_set_pwm(&g.rc_4, periods[3]);		//yaw,PWM转为期望角度radio_in -> control_in
 
-		set_throttle_and_failsafe(periods[2]);	//判断是否失控
+		set_throttle_and_failsafe(periods[2]);			//判断是否失控
 		set_throttle_zero_flag(g.rc_3.control_in);		//0输出油门超过一定时间
 
 	}

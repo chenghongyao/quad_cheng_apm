@@ -46,7 +46,6 @@ typedef struct
 
 
 extern scheduler_t scheduler;
-
 void scheduler_init(scheduler_tasks_t *tasks, uint8_t num_tasks);
 //timer
 void scheduler_resume_timer_procs(void);

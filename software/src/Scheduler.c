@@ -62,6 +62,7 @@ void scheduler_register_timer_process(timer_process_t proc)
 
 	if (scheduler.num_timer_procs < SCHEDULER_MAX_TIMER_PROCS)
 	{
+		//printf("timer register\n");
 		scheduler.timer_proc[scheduler.num_timer_procs] = proc;
 		scheduler.num_timer_procs++;
 	}
@@ -78,7 +79,11 @@ void scheduler_timer_event()
 		for(i=0;i<scheduler.num_timer_procs;i++)
 		{
 			if(scheduler.timer_proc[i] != NULL)
+			{
 				scheduler.timer_proc[i]();
+				//printf("proc");
+			}
+				
 		}
 	}
 	scheduler.in_timer_proc = 0;

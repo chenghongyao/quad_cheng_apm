@@ -88,6 +88,7 @@ uint8_t nrf24l01_check(void);
 void nrf24l01_setTxRxMode(uint8_t mode);
 uint8_t nrf24l01_sendPacket(void *txbuf,uint8_t len);
 uint8_t nrf24l01_sendPacket2(void *txbuf,uint8_t len);
+u8 nrf24l01_sendPacket3(void *txbuf,u8 len);
 uint8_t nrf24l01_recvPacket(void *rxbuf);
 void nrf24l01_sendAckPacket(uint8_t *buf,uint8_t len);
 #endif

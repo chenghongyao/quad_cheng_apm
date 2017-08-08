@@ -15,11 +15,12 @@ int16_t apmotor_get_angle_boost(int16_t throttle_pwm)
     float temp = ahrs.cos_pitch * ahrs.cos_roll;
     int16_t throttle_out;
 
+		
     temp = constrain_float(temp, 0.5f, 1.0f);
-	
+		temp = sqrtf(temp);			//直接补偿发现补偿过大，开平方减少补偿量
     // apply scale and constrain throttle
     // To-Do: move throttle_min and throttle_max into the AP_Vehicles class?
-    throttle_out = constrain_float((float)(throttle_pwm-g.throttle_min) * temp + g.throttle_min, g.throttle_min, 1000);
+    throttle_out = constrain_float((float)(throttle_pwm-g.throttle_min) / temp + g.throttle_min, g.throttle_min, 1000);
 	// record angle boost for logging
    
 	apmotor.angle_boost = throttle_out - throttle_pwm;
@@ -43,6 +44,7 @@ void apmotor_update_max_throttle()
 		}
 	}
 	
+	//定高油门会让油门缓慢启动
 	if(!apmotor.flags.slow_start)	////非慢启动，则用最大油门
 	{
 		return;
@@ -118,8 +120,8 @@ void apmotor_output_armed()
 {
 	int8_t i;
 	int16_t out_min_pwm = apmotor.rc_throttle->radio_min + apmotor.min_throttle;   // 最小的pwm输出(到motor)
-	int16_t out_max_pwm =  apmotor.rc_throttle->radio_max;						  // 最大的pwm输出2000?
-	int16_t out_mid_pwm = (out_min_pwm+out_max_pwm)/2;                  		  // pwm输出中值 ~~1500
+	int16_t out_max_pwm =  apmotor.rc_throttle->radio_max;						  					// 最大的pwm输出2000
+	int16_t out_mid_pwm = (out_min_pwm+out_max_pwm)/2;                  		  		// pwm输出中值 ~~1500
 	
 	int16_t out_best_thr_pwm;		 //最佳输出油门(悬停 the is the best throttle we can come up which provides good control without climbing
 	float	rpy_scale = 1.0; 		//缩放rpy使其不超过范围this is used to scale the roll, pitch and yaw to fit within the motor limits，

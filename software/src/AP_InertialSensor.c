@@ -169,8 +169,7 @@ static void _poll_data()
 	int16_t acc_adc[3];
 	int16_t gyro_adc[3];
 
-	mpu6050_getAccAdc(acc_adc);
-	mpu6050_getGyroAdc(gyro_adc);
+	if(!mpu6050_getAdcAll(acc_adc,gyro_adc))return;
 	
 	ins.accel_sum.x += (float)acc_adc[1];
 	ins.accel_sum.y += (float)acc_adc[0];
@@ -191,6 +190,8 @@ static void _poll_data()
 
 void inertial_sensor_init_sensor()
 {
+
+	 mpu6050_init();
 	scheduler_suspend_timer_procs();
 	scheduler_register_timer_process(_poll_data);
 	scheduler_resume_timer_procs();

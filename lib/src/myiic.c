@@ -2,7 +2,7 @@
 #include "sys.h"
 
 
-
+volatile static uint8_t my_iic_sem = 0;
 
 void IIC_delay(void)			//根据通信器件可接受速读更改此函数
 {
@@ -191,6 +191,32 @@ uint8_t IIC_DevReadBuf(uint8_t dev_addr,uint8_t reg_addr,uint8_t len,uint8_t* pB
 	return 0;
 }
 //==========================================================================================
+uint8_t myiic_sem_take_blocking()
+{
+	while(my_iic_sem);
+	my_iic_sem = 1;
+	return 1;
+}
+
+uint8_t myiic_sem_take_nonblocking()
+{
+	if(my_iic_sem)
+	{
+		//printf("iic sem fail\n");
+		return 0;
+	}
+	//printf("iic sem tack\n");
+	my_iic_sem = 1;
+	return 1;	
+}
+
+void myiic_sem_give()
+{
+	//printf("iic sem give\n");
+	my_iic_sem = 0;
+}
+
+
 
 
 

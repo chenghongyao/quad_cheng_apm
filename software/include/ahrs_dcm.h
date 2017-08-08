@@ -80,7 +80,6 @@ typedef struct
 	float kp_yaw;				//default = 0.1
 	float kp;						//default = 0.1
 	float gyro_drift_limit;
-	
 	// a vector to capture the difference between the controller and body frames
 	vector3f_t trim;			//AP!!	
 	
