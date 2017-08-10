@@ -7,7 +7,7 @@
 #include "LowPassFilter.h"
 
 
-
+#define POSCONTROL_THROTTLE_HOVER               500  // default throttle required to maintain hover
 
 #define POSCONTROL_TAKEOFF_JUMP_CM              0.0f  // during take-off altitude target is set to current altitude + this value
 
@@ -15,6 +15,8 @@
 #define POSCONTROL_SPEED_DOWN                  -150.0f  // default descent rate in cm/s
 #define POSCONTROL_SPEED_UP                     250.0f  // default climb rate in cm/s
 #define POSCONTROL_VEL_XY_MAX_FROM_POS_ERR      200.0f  // max speed output from pos_to_vel controller when feed forward is used
+#define POSCONTROL_STOPPING_DIST_Z_MAX          200.0f  // max stopping distance vertically   
+														// should be 1.5 times larger than POSCONTROL_ACCELERATION.
 
 
 #define POSCONTROL_ACTIVE_TIMEOUT_MS            200     // position controller is considered active if it has been called within the past 200ms (0.2 seconds)
@@ -37,12 +39,12 @@ typedef struct
 
 	vector3f_t vel_target;            // velocity target in cm/s calculated by pos_to_rate step
 	vector3f_t accel_feedforward;     // feedforward acceleration in cm/s/s
-	vector3f_t vel_last;
+	vector3f_t vel_last;				//上一个期望速度,用于加速度前馈
 	vector3f_t vel_error;
 
+	uint32_t last_update_z_ms;
 	float throttle_hover;
 	float       alt_max;               // max altitude - should be updated from the main code with altitude limit from fence
-	uint32_t last_update_z_ms;
 	float		dt;
 	float       speed_down_cms;        // max descent rate in cm/s
 	float       speed_up_cms;          // max climb rate in cm/s
@@ -92,4 +94,7 @@ void pos_control_init_takeoff(void);
 void pos_control_set_alt_target_from_climb_rate(float climb_rate_cms, float dt, uint8_t force_descend);
 void pos_control_update_z_controller(void);
 void pos_control_set_dt(float dt);
+void pos_control_set_accel_z(float accel_cmss);
+void pos_control_set_speed_z(float speed_down, float speed_up);
+void pos_control_set_target_to_stopping_point_z(void);
 #endif

@@ -1,6 +1,6 @@
 #include "radio.h"
 #include "sys.h"
-#include "define.h"
+#include "defines.h"
 
 #include "AP_Motor.h"
 #include "paramter.h"
@@ -128,6 +128,11 @@ void init_rc_in()
 	rc_set_type(apmotor.rc_yaw, RC_CHANNEL_TYPE_ANGLE_RAW);
 	//default_dead_zones();		//paramater中设置
 	ap.flags.throttle_zero = 1;
+	
+	rc_set_range(&g.rc_5,0, 1000);//rc.low,low_out,high,high_out输出最小最大油门
+	rc_set_range(&g.rc_6,0, 1000);
+	rc_set_range(&g.rc_7,0, 1000);
+	rc_set_range(&g.rc_8,0, 1000);
 }
 
 
@@ -158,10 +163,10 @@ void rcin_read(uint16_t *periods,uint8_t len)
 	periods[1] = sbus.channel.ch2+600;
 	periods[2] = sbus.channel.ch3+600;
 	periods[3] = sbus.channel.ch4+600;
-	periods[4] = 1500;
-	periods[5] = 1500;
-	periods[6] = 1500;
-	periods[7] = 1500;
+	periods[4] = sbus.channel.ch5+600;
+	periods[5] = sbus.channel.ch6+600;
+	periods[6] = sbus.channel.ch7+600;
+	periods[7] = sbus.channel.ch8+600;
 }
 
 ///////////////////////////////////////////////
@@ -182,6 +187,15 @@ void read_radio(void)
 
 		set_throttle_and_failsafe(periods[2]);			//判断是否失控
 		set_throttle_zero_flag(g.rc_3.control_in);		//0输出油门超过一定时间
+		
+		
+		rc_set_pwm(&g.rc_5, periods[4]);
+		
+		rc_set_pwm(&g.rc_6, periods[5]);
+		rc_set_pwm(&g.rc_7, periods[6]);
+		rc_set_pwm(&g.rc_8, periods[7]);
+			
+
 
 	}
 	else

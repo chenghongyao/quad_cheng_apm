@@ -9,12 +9,15 @@
 
 #include "paramter.h"
 #include "stabilize.h"
+#include "althold.h"
 #include "radio.h"
 #include "notify.h"
 #include "ano.h"
 #include "sbus.h"
 #include "barometer.h"
 #include "inertia.h"
+#include "defines.h"
+#include "land_detector.h"
 
 inertial_sensor_t ins;
 InertialNav_t inav;
@@ -31,8 +34,9 @@ copter_t ap;
 failsafe_t failsafe;
 Compass_t compass;
 
-
-
+static int8_t control_mode = ALT_HOLD;		//全局变量,控制模式,默认为自稳
+uint8_t oldSwitchPosition;
+uint8_t *flight_modes = g.flight_modes;
 // Stores initial bearing when armed - initial simple bearing is modified in super simple mode so not suitable
 int32_t initial_armed_bearing;		//解锁时的方向,在接解锁时读取 init_arm_motors中初始化,(解锁动作调用)
 float simple_cos_yaw = 1.0;				// init_arm_motors中初始化为当前yaw(解锁动作调用)
@@ -65,10 +69,9 @@ static uint16_t mainLoop_count;		//loop运行计数
 ////////////////////////////////////////////////////////////////////////////////
 // Altitude
 ////////////////////////////////////////////////////////////////////////////////
-//// The cm/s we are moving up or down based on filtered data - Positive = UP
+// The cm/s we are moving up or down based on filtered data - Positive = UP
 //static int16_t climb_rate = 0;				//爬升速率,velocity.z
-//// The altitude as reported by Sonar in cm - Values are 20 to 700 generally.
-
+// The altitude as reported by Sonar in cm - Values are 20 to 700 generally.
 int16_t sonar_alt;
 uint8_t sonar_alt_health;    // true if we can trust the altitude from the sonar
 float target_sonar_alt;      // desired altitude in cm above the ground
@@ -77,12 +80,11 @@ int32_t baro_alt;            // barometer altitude in cm above home
 float baro_climbrate;        // barometer climbrate in cm/s
 
 
-
-
 ///////////////////////////////////////////////////////////////////////////////////////
 static void fast_loop(void);
 static void read_AHRS(void);
 static void set_servos_4(void);
+static void update_flight_mode(void);
 void rc_loop(void);
 void throttle_loop(void);
 void arm_motors_check(void);
@@ -114,12 +116,12 @@ static scheduler_tasks_t scheduler_tasks[] =
 	{update_notify,				2,			100},		//50Hz,更新灯
 	{one_hz_loop,				100,		420},		//pre_arm_checks
 	{update_altitude,			10,			1000 },		//更新高度10Hz,100ms??(读取气压计,超声波)
+	{throttle_loop, 			2,		  450 },		//油门更新50Hz??:读取高度和爬升速率到climb_rate,current_loc,检查是否降落或自动解锁
 };
 
 void setup()
 {
 	param_setup_and_load();		//加载系统参数
-
 	//电调校准
 	if(g.esc_calibrate)
 	{
@@ -148,15 +150,16 @@ void setup()
 	pos_control_init();
 	InertialNav_init();
 
+
 	init_rc_in();
 	init_rc_out();
+	
 
 	notify.flags .initialising = 0;
 	//printf("ready");
 }
 
 
-extern uint32_t ms5611_d1;
 //extern float ms5611_temperature;				//温度
 //extern float ms5611_pressure;				//温度
 extern uint16_t motor_monitor[4];
@@ -186,7 +189,8 @@ void loop()
 	//ANO_DT_Send_Status((float)ahrs.roll_sensor/100,(float)ahrs.pitch_sensor/100,ahrs.yaw_sensor/100,0,0,0);				//2ms?
 	// tell the scheduler one tick has passed
 	//ANO_DT_Send_Status((float)g.rc_1.control_in/100,(float)g.rc_2.control_in/100,(float)g.rc_4.control_in/100,g.rc_3.control_in,0,0);
-	ANO_DT_Send_Sensor(inav.velocity.z,inav.position.z,barometer.altitude ,inav.position_error.z,hist_base,hist_push, 0, 0, 0);
+	ANO_DT_Send_Sensor(pos_ctrl.pos_target.z,inav.position.z ,pos_ctrl.vel_target.z,inav.velocity.z,apmotor.rc_throttle->servo_out,barometer.altitude ,baro_climbrate,0,0);
+	//ANO_DT_Send_Sensor(desired_climb_rate,pos_ctrl.pos_target.z,inav.velocity.z ,baro_climbrate,0,0, 0, 0, 0);
 	
 	scheduler_tick();	
 	time_available = (timer + MAIN_LOOP_MICROS) - micros();//运行10ms
@@ -199,14 +203,12 @@ void loop()
 
 void fast_loop()
 {
-	read_AHRS();		//--
-	rate_controller_run();		//!速率控制
-	set_servos_4();						//
-	read_inertia();					//更新_velocity,_position 
-	stabilize_run();				//姿态 control_in -> rate_bf_target,油门 control_in -> servo_out
+	read_AHRS();								//--
+	rate_controller_run();			//!速率控制
+	set_servos_4();							//
+	read_inertia();							//更新_velocity,_position 
+	update_flight_mode();
 }
-
-
 
 
 static void read_AHRS()
@@ -220,13 +222,107 @@ static void set_servos_4()
 }
 
 
+
+static void update_flight_mode()
+{
+	switch (control_mode)
+	{
+	case STABILIZE:
+		stabilize_run();				//姿态 control_in -> rate_bf_target,油门 control_in -> servo_out
+		break;
+	case ALT_HOLD:
+		althold_run();
+		break;
+	default:
+		break;
+	}
+}
+
 //=================================================================
+
+uint8_t readSwitch(void)
+{
+	int16_t pulsewidth;
+//	degub("control_in=%d",g.rc_5.control_in);
+	pulsewidth = g.rc_5.control_in;   // default for Arducopters
+	if (pulsewidth < 333) return 0;
+	if (pulsewidth < 666) return 1;
+	return 2;                               // Hardware Manual
+}
+uint8_t set_mode(uint8_t mode)
+{
+   // boolean to record if flight mode could be set
+   uint8_t success = 0;
+   uint8_t ignore_checks = !apmotor.flags.armed;   // allow switching to any mode if disarmed.  We rely on the arming check to perform
+																									//上锁状态下可以忽略检测
+   // return immediately if we are already in the desired mode
+   if (mode == control_mode) 
+   {		
+       return 1;				//模式没有改变
+   }
+	 
+   switch(mode) 
+   {
+       case STABILIZE:
+         success = stabilize_init(ignore_checks);	
+			   debug("stabilize");
+           break;
+       case ALT_HOLD:
+			   success = althold_init(ignore_checks);
+			   debug("althold");
+				break;
+	   default:
+           success = 0;
+           break;
+   }
+   // update flight mode
+	if (success) 
+	{
+       // perform any cleanup required by previous flight mode
+       control_mode = mode;
+   }
+   // return success or failure
+   return success;
+}
+
+
+#define CONTROL_SWITCH_COUNTER  20  // 20 iterations at 100hz (i.e. 2/10th of a second) at a new switch position will cause flight mode change
+void read_control_switch()
+{
+   static uint8_t switch_counter = 0;
+	static uint8_t first = 1;
+   uint8_t switchPosition = readSwitch();		//模式选择开关位置,第5通道
+   // has switch moved?
+   // ignore flight mode changes if in failsafe ,检测到改变200ms
+	if ((first || oldSwitchPosition != switchPosition) && !failsafe.radio && failsafe.radio_counter == 0) //模式改变
+	{
+		switch_counter++;
+		if(first || switch_counter >= CONTROL_SWITCH_COUNTER) 
+		{
+			first = 0;
+			oldSwitchPosition       = switchPosition;
+			switch_counter          = 0;
+			// set flight mode and simple mode setting
+			//根据拨杆位置获取飞行模式(在参数表中)
+			if (set_mode(flight_modes[switchPosition]))//设置飞行模式成功->control_mode
+			{		
+					
+			}
+		}
+	}
+	else
+	{
+       // reset switch_counter if there's been no change
+       // we don't want 10 intermittant blips causing a flight mode change
+       switch_counter = 0;
+	}
+}
+
 void rc_loop()//100Hz
 {
 	read_radio();
-
+	read_control_switch();
 }
-
 
 //10Hz，解锁，上锁动作检测？？？？？？？
 void arm_motors_check(void)
@@ -283,6 +379,47 @@ void arm_motors_check(void)
 
 
 
+void update_notify(void)
+{
+	notify_update();
+}
+
+void update_baro_altitude()
+{
+	barometer_read();//处理气压,温度->Temp,Press
+	baro_alt = barometer_get_altitude();
+	baro_climbrate = barometer_get_climbrate();
+}
+
+
+
+//更新气压高度,速率,超声波高度
+void update_altitude()
+{
+	update_baro_altitude();
+}
+
+
+
+
+void one_hz_loop(void)
+{
+	// perform pre-arm checks & display failures every 5 seconds
+	static uint8_t pre_arm_display_counter = 15;
+	pre_arm_display_counter++;
+	if (pre_arm_display_counter >= 5)
+	{
+		pre_arm_checks(1);				//
+		pre_arm_display_counter = 0;
+	}
+	else
+	{
+		pre_arm_checks(1);
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+
 void init_simple_bearing()
 {
 	initial_armed_bearing = ahrs.yaw_sensor;
@@ -298,79 +435,12 @@ void init_simple_bearing()
 }
 
 
-// update_auto_armed - update status of auto_armed flag
-// static void update_auto_armed()
-// {
-// 	// disarm checks
-// 	if (ap.flags.auto_armed)
-// 	{		//允许自动解锁
-// 		// if motors are disarmed, auto_armed should also be false
-// 		if (!apmotor.flags.armed) 				//一旦上锁，就关闭自动解锁
-// 			{			//上锁了
-// 				set_auto_armed(0);		//关闭自动解锁
-// 				return;
-// 			}
-// 			//还未上锁，如果，如果油门时0，也关闭自动解锁
-// 		// if in stabilize or acro flight mode and throttle is zero, auto-armed should become false
-// 		//没有上锁,子自稳和特技模式下，如果油门时0，就关闭自动解锁
-// 		if (ap.flags.throttle_zero && !failsafe.radio) 
-// 		{//自稳和特技模式且如果信号没有丢失且???关闭自动解锁
-// 			set_auto_armed(0);
-// 		}
-// 
-// 	}
-// 	else
-// 		{	//不允许自动解锁??
-// 		// arm checks
-// 		// if motors are armed and throttle is above zero auto_armed should be true
-// 		if (apmotor.flags.armed && !ap.flags.throttle_zero) //解锁了且油门非0;
-// 		{
-// 			set_auto_armed(1);//解锁了且油门非0,使能自动解锁
-// 		}
-// 
-// 	}
-// }
-
-// 50Hz
-// void throttle_loop()
-// {
-// 	update_auto_armed();		//?????
-// 
-// }
-
-
-void update_notify(void)
+//50Hz
+void throttle_loop()
 {
-	notify_update();
+//	climb_rate = inav.velocity.z;
+	update_land_detector();
+//	update_auto_armed();		//?????
+
 }
 
-
-
-void update_baro_altitude()
-{
-	barometer_read();//处理气压,温度->Temp,Press
-	baro_alt = barometer_get_altitude();
-	baro_climbrate = barometer_get_climbrate()*100.0f;
-}
-
-//更新气压高度,速率,超声波高度
-void update_altitude()
-{
-	update_baro_altitude();
-}
-
-void one_hz_loop(void)
-{
- // perform pre-arm checks & display failures every 30 seconds
-    static uint8_t pre_arm_display_counter = 15;
-    pre_arm_display_counter++;
-    if (pre_arm_display_counter >= 5) 
-		{	
-			pre_arm_checks(1);				//
-			pre_arm_display_counter = 0;
-    }
-		else
-		{
-      pre_arm_checks(1);
-    }
-}

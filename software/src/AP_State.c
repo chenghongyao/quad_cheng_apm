@@ -19,7 +19,14 @@ void set_land_complete(uint8_t b)
     if( ap.flags.land_complete == b )		//没有改变
         return;
 
-
+	if (b == 1)
+	{
+		debug("land");
+	}
+	else
+	{
+		debug("non land");
+	}
     ap.flags.land_complete = b;
 }
 

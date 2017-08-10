@@ -22,7 +22,6 @@ vector3f_t *vector3f_add(vector3f_t *dst,const vector3f_t *vec,vector3f_t *out)
 	out->z = dst->z + vec->z;
 	return out;
 }
-
 //!
 vector3f_t *vector3f_minus(vector3f_t *dst,const vector3f_t *vec,vector3f_t *out)
 {

@@ -1,7 +1,7 @@
 #ifndef _BAROMETER_H_
 #define _BAROMETER_H_
 #include "sys.h"
-
+#include "DerivativeFilter.h"
 
 typedef struct
 {	
@@ -15,7 +15,7 @@ typedef struct
 	uint32_t start_time;
 	uint32_t sample_dt;
 	uint8_t  pressure_samples;
-	//float raw_press, raw_temp;
+
 	float ground_pressure;
 	float ground_temperature;
 	float Press, Temp;
@@ -26,6 +26,7 @@ typedef struct
 	uint32_t last_altitude_t;
 	float    altitude;
 
+	DerivativeFilter_T climb_rate_filter;
 
 	struct Baro_flags {
 		uint8_t healthy : 1;             // true if sensor is healthy
@@ -34,8 +35,8 @@ typedef struct
 	} flags;
 
 	//AP!
-	int8_t alt_offset;		
-}barometer_t;
+	float alt_offset;		
+}barometer_t;	
 extern barometer_t barometer;
 
 

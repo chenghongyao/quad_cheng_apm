@@ -137,20 +137,20 @@
 
 
 #ifndef ALT_HOLD_P
-# define ALT_HOLD_P            1.0f
+# define ALT_HOLD_P            0.8f
 #endif
 
 // RATE control
 #ifndef THROTTLE_RATE_P
-# define THROTTLE_RATE_P       5.0f
+# define THROTTLE_RATE_P       3.5f
 #endif
 
 // Throttle Accel control
 #ifndef THROTTLE_ACCEL_P
-# define THROTTLE_ACCEL_P      0.50f
+# define THROTTLE_ACCEL_P      0.27f
 #endif
 #ifndef THROTTLE_ACCEL_I
-# define THROTTLE_ACCEL_I      1.00f
+# define THROTTLE_ACCEL_I      0.54f
 #endif
 #ifndef THROTTLE_ACCEL_D
 # define THROTTLE_ACCEL_D      0.0f
@@ -228,10 +228,13 @@
 # define FS_RADIO_RC_OVERRIDE_TIMEOUT_MS  2000    // RC Radio failsafe triggers after 2 seconds while using RC_override from ground station
 #endif
 
+
+
 // Radio failsafe
 #ifndef FS_RADIO_TIMEOUT_MS
 #define FS_RADIO_TIMEOUT_MS            500     // RC Radio Failsafe triggers after 500 miliseconds with No RC Input
 #endif
+
 
 
 //RADIO值

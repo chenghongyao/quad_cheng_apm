@@ -12,7 +12,7 @@ void usart1_init()
 {
 	H_USART1_ENRCC();
 	
-	H_USART_Init(1,500000,USART_Mode_Rx | USART_Mode_Tx);
+	H_USART_Init(1,500000	,USART_Mode_Rx | USART_Mode_Tx);
 	H_USART_IT_RXNE(1,2,2);
 	
 	H_GPIO_Init(A,9,GPIO_Speed_50MHz,GPIO_Mode_AF_PP);

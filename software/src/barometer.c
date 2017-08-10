@@ -11,6 +11,8 @@ void barometer_init(void)
 	barometer.d1 = 0;
 	barometer.d1_count = 0;
 	barometer.updated = 0;
+	DerivativeFilter_Init(&barometer.climb_rate_filter, 7);
+
 	
 	myiic_sem_take_blocking();
 	ms5611_reset();
@@ -27,43 +29,14 @@ void barometer_init(void)
 	scheduler_register_timer_process(barometer_update);
 	scheduler_resume_timer_procs();
 	
-//	barometer_calibrate();
+	barometer.flags.glitching  = 0;
+	
+	barometer_calibrate();
 }
-
 
 
 void barometer_calculate()
 {
-//	float dT;
-//	float TEMP;
-//	float OFF;
-//	float SENS;
-//	// Formulas from manufacturer datasheet
-//	// sub -20c temperature compensation is not included
-
-//	// we do the calculations using floating point
-//	// as this is much faster on an AVR2560, and also allows
-//	// us to take advantage of the averaging of D1 and D1 over
-//	// multiple samples, giving us more precision
-//	dT = barometer.D2 - (((uint32_t)barometer.C5) << 8);
-//	TEMP = (dT *barometer.C6) / 8388608;	//+20000？？
-//	OFF = barometer.C2 * 65536.0f + (barometer.C4 * dT) / 128;
-//	SENS = barometer.C1 * 32768.0f + (barometer.C3 * dT) / 256;
-//	if (TEMP < 0) 
-//	{
-//		// second order temperature compensation when under 20 degrees C
-//		float T2 = (dT*dT) / 0x80000000;//???
-//		float Aux = TEMP*TEMP;
-//		float OFF2 = 2.5f*Aux;
-//		float SENS2 = 1.25f*Aux;
-//		TEMP = TEMP - T2;		//????
-//		OFF = OFF - OFF2;
-//		SENS = SENS - SENS2;
-//	}
-//	barometer.Press = (barometer.D1*SENS / 2097152 - OFF) / 32768;
-//	barometer.Temp = (TEMP + 2000) * 0.01f;
-
-
 	int32_t off2 = 0, sens2 = 0, delt;
 	int32_t temperature,pressure;
 	int32_t dT;
@@ -93,10 +66,10 @@ void barometer_calculate()
 	sens -= sens2;
 	barometer.Press = pressure = ((((uint32_t)barometer.D1 * sens ) >> 21) - off) >> 15;			
 	alt_3 = (101000 - pressure)/1000.0f;
-	pressure = 0.82f *alt_3 * alt_3 *alt_3 + 0.09f *(101000 - pressure)*100.0f ;	
+	barometer.altitude = 0.82f *alt_3 * alt_3 *alt_3 + 0.09f *(101000 - pressure)*100.0f ;	
+	barometer.altitude -= barometer.alt_offset;
+	DerivativeFilter_Update(&barometer.climb_rate_filter, barometer.altitude, barometer.last_update);
 	
-	barometer.altitude = pressure;
-	//barometer.Temp += 0.01f *( ( 0.01f *temperature ) - barometer.Temp );
 	barometer.Temp = temperature*0.01f;
 
 }
@@ -128,8 +101,8 @@ uint8_t barometer_read()
 			barometer.D2 = ((float)sD2) / d2count;
 		}
 		barometer.pressure_samples = d1count;
-		barometer_calculate();
 		barometer.last_update = millis();
+		barometer_calculate();
 	}
 	return updated ? 1 : 0;
 }
@@ -140,6 +113,7 @@ void barometer_calibrate()
 {
 	float ground_pressure = 0;
 	float ground_temperature = 0;
+	float alt_offset = 0.0f;
 	uint32_t tstart;
 	uint32_t i;
 
@@ -180,12 +154,15 @@ void barometer_calibrate()
 		barometer_read();		//读取温度，气压到Temp，Press	
 		if (millis() - tstart > 500)		//超时？？
 		{
-
+			
 		}
 		ground_pressure = ground_pressure*0.8 + barometer.Press*0.2;
 		ground_temperature = ground_temperature*0.8 + barometer.Temp*0.2;
+		alt_offset += 0.2*barometer.altitude;
 		delay_ms(100);
 	}
+	barometer.alt_offset = alt_offset;
+	barometer.altitude -= alt_offset;
 	barometer.ground_pressure = ground_pressure;
 	barometer.ground_temperature = ground_temperature;
 }
@@ -208,8 +185,7 @@ float barometer_get_altitude_difference(float base_pressure, float pressure)
 
 float barometer_get_climbrate()
 {
-
-	return 0;
+	return DerivativeFilter_Slope(&barometer.climb_rate_filter)*1000.0f;
 }
 float barometer_get_altitude()
 {

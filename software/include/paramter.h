@@ -9,7 +9,6 @@
 
 typedef struct
 {
-	
 	//RC
 	rcchannel_t         rc_1;
 	rcchannel_t         rc_2;
@@ -62,7 +61,9 @@ typedef struct
 	
 	//Alt hold
 	int16_t pilot_velocity_z_max;		//z轴最大速度,cm??	
+	int16_t pilot_accel_z;               // vertical acceleration the pilot may request
 
+	uint8_t flight_modes[3];
 	
 
 }paramter_t;
@@ -116,7 +117,6 @@ extern copter_t ap;
 extern paramter_t g;
 extern failsafe_t failsafe;
 
-void paramter_init(void);
 void param_setup_and_load(void);
 #endif
 

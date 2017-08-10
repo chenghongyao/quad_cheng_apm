@@ -3,6 +3,8 @@
 #include "sys.h"
 
 
+uint8_t althold_init(uint8_t ignore_check);
+void althold_run(void);
 
 
 #endif

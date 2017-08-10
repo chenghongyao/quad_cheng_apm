@@ -6,6 +6,14 @@
 
 #include "Attitude.h"
 
+
+uint8_t stabilize_init(uint8_t ignore_check)
+{
+	
+	return 1;
+}
+
+
 void stabilize_run()
 {
 	int16_t target_roll, target_pitch;

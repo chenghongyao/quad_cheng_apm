@@ -68,7 +68,7 @@ void InertialNav_correct_with_baro(float baro_alt,float dt)
 	static uint8_t first_read = 0;
 	if (dt > 0.5f)return;
 
-	if (first_read <= 10)		//前10个数据,用于确定当前高度,position.z
+	if (first_read <= 30)		//前10个数据,用于确定当前高度,position.z
 	{
 		InertialNav_set_altitude(baro_alt);
 		first_read++;
@@ -100,7 +100,8 @@ void InertialNav_correct_with_baro(float baro_alt,float dt)
 
 			// calculate error in position from baro with our estimate
 			//位置误差
-			inav.position_error.z = baro_alt - (hist_position_base_z + inav.position_correction.z);		
+			inav.position_error.z = baro_alt - (hist_position_base_z + inav.position_correction.z);	
+				
 			hist_base = hist_position_base_z;
 		}
 	}
@@ -110,9 +111,10 @@ void InertialNav_correct_with_baro(float baro_alt,float dt)
 
 void InertialNav_check_baro()
 {
+	float dt;
 	if (barometer.last_update != inav.baro_last_update)//气压计数据更新了	
 	{
-		float dt = (float)(barometer.last_update - inav.baro_last_update)*0.001f;
+		dt = (float)(barometer.last_update - inav.baro_last_update)*0.001f;
 		InertialNav_correct_with_baro(barometer.altitude, dt);//用气压计高度纠正position_error.z
 		inav.baro_last_update = barometer.last_update;
 	}

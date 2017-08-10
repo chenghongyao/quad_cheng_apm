@@ -29,7 +29,7 @@
 
 #include "config.h"
 
-//#define _DEBUG
+#define _DEBUG
 #define _LOGT			//发送时间标签
 
 

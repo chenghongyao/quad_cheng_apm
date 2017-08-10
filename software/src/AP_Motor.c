@@ -3,7 +3,7 @@
 #include "cmath.h"
 #include "sys.h"
 #include "paramter.h"
-#include "define.h"
+#include "defines.h"
 
 #include "AP_InertialSensor.h"
 #include "AP_State.h"
@@ -23,7 +23,7 @@ int16_t apmotor_get_angle_boost(int16_t throttle_pwm)
     throttle_out = constrain_float((float)(throttle_pwm-g.throttle_min) / temp + g.throttle_min, g.throttle_min, 1000);
 	// record angle boost for logging
    
-	apmotor.angle_boost = throttle_out - throttle_pwm;
+		apmotor.angle_boost = throttle_out - throttle_pwm;
 
     return throttle_out;
 }

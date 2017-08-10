@@ -4,7 +4,7 @@
 #include "AC_PID.h"
 
 #include "config.h"
-#include "define.h"
+#include "defines.h"
 
 
 
@@ -49,6 +49,29 @@ void param_setup_and_load()
 	g.rc_4.dead_zone = 40;			//
 	g.rc_4.reverse = 1;				//
 
+	g.rc_5.radio_min = RADIO_MIN_DEFAULT;
+	g.rc_5.radio_max = RADIO_MAX_DEFAULT;
+	g.rc_5.radio_trim = RADIO_MIN_DEFAULT;
+	g.rc_5.dead_zone = 0;			//
+	g.rc_5.reverse = 1;				//
+
+	g.rc_6.radio_min = RADIO_MIN_DEFAULT;
+	g.rc_6.radio_max = RADIO_MAX_DEFAULT;
+	g.rc_6.radio_trim = RADIO_MIN_DEFAULT;
+	g.rc_6.dead_zone = 0;			//
+	g.rc_6.reverse = 1;				//
+	
+	g.rc_7.radio_min = RADIO_MIN_DEFAULT;
+	g.rc_7.radio_max = RADIO_MAX_DEFAULT;
+	g.rc_7.radio_trim = RADIO_MIN_DEFAULT;
+	g.rc_7.dead_zone = 0;			//
+	g.rc_7.reverse = 1;				//
+
+	g.rc_8.radio_min = RADIO_MIN_DEFAULT;
+	g.rc_8.radio_max = RADIO_MAX_DEFAULT;
+	g.rc_8.radio_trim = RADIO_MIN_DEFAULT;
+	g.rc_8.dead_zone = 0;			//
+	g.rc_8.reverse = 1;				//
 
 /////// Throttle////////////////////////////////////////////////////////////////////////
 	g.throttle_min = THR_MIN_DEFAULT;			//radio转为最小最大油门
@@ -72,6 +95,8 @@ void param_setup_and_load()
 
 	//定高PID
 	acpid_set(&g.p_alt_pos, ALT_HOLD_P, 0, 0, 0);	//default = 1.0
+	acpid_set(&g.p_alt_rate, THROTTLE_RATE_P, 0, 0, 0);
+	acpid_set(&g.pid_alt_accel, THROTTLE_ACCEL_P, THROTTLE_ACCEL_I, THROTTLE_ACCEL_D, THROTTLE_ACCEL_IMAX);
 
 
 	//g,其他
@@ -84,22 +109,25 @@ void param_setup_and_load()
 	g.pilot_velocity_z_max = PILOT_VELZ_MAX;
 
 
+	//
+	g.flight_modes[0] = STABILIZE;
+	g.flight_modes[1] = STABILIZE;
+	g.flight_modes[2] = ALT_HOLD;
+	g.pilot_velocity_z_max = PILOT_VELZ_MAX;
+	g.pilot_accel_z = PILOT_ACCEL_Z_DEFAULT;
+
 	
 	//ap////////////////////////////////////////////
 	ap.flags.pre_arm_check = 0;		//
 	ap.flags.pre_arm_rc_check = 0;
 	ap.flags.simple_mode = 0;		//0 =自稳 ; 1 = SIMPLE(无头); 2 = SUPERSIMPLE
+	ap.flags.land_complete = 1;
+	ap.flags.land_complete_maybe = 1;
 	
-
 	
-	
-	
-
+	//
+	failsafe.radio = 0;
+	failsafe.radio_counter = 0;
 }
 
-
-void paramter_init(void)
-{
-	
-}
 

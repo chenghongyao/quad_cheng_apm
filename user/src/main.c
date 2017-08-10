@@ -13,8 +13,6 @@ int main(void)
 	motor_init();				
 	nrf24l01_init();
 	nrf24l01_setTxRxMode(NRF_TXEN);
-	
-	//ms5611_init();
 	sbus_init();
 	setup();
 	while(1)
@@ -22,6 +20,3 @@ int main(void)
 		loop();
 	}
 }
-
-
-

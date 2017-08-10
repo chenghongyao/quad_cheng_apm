@@ -54,7 +54,7 @@ int16_t get_pilot_desired_throttle(int16_t throttle_control)
 // without any deadzone at the bottom
 #define THROTTLE_IN_DEADBAND_TOP (THROTTLE_IN_MIDDLE + g.throttle_deadzone)  // top of the deadband
 #define THROTTLE_IN_DEADBAND_BOTTOM (THROTTLE_IN_MIDDLE - g.throttle_deadzone)  // bottom of the deadband
-extern int16_t desired_climb_rate;
+extern int16_t desired_climb_rate;		//for debug
 int16_t get_pilot_desired_climb_rate(int16_t throttle_control)
 {
 	int16_t desired_rate = 0;
@@ -72,7 +72,7 @@ int16_t get_pilot_desired_climb_rate(int16_t throttle_control)
 	//归一化得期望速率
 	if (throttle_control < THROTTLE_IN_DEADBAND_BOTTOM) //在死区以下
 	{
-		// below the deadband
+		// below the deadband,default max = 250cm/s
 		desired_rate = (int32_t)g.pilot_velocity_z_max * (throttle_control - THROTTLE_IN_DEADBAND_BOTTOM) / (THROTTLE_IN_MIDDLE - g.throttle_deadzone);
 	}
 	else if (throttle_control > THROTTLE_IN_DEADBAND_TOP) 
@@ -96,9 +96,8 @@ void set_throttle_takeoff()
 {
 	// tell position controller to reset alt target and reset I terms
 	pos_control_init_takeoff();
-
 	// tell motors to do a slow start
-	apmotor.flags.slow_start = 1;		//???
+	apmotor.flags.slow_start = 1;		
 }
 // get_non_takeoff_throttle - a throttle somewhere between min and mid throttle which should not lead to a takeoff
 int16_t get_non_takeoff_throttle()

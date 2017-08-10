@@ -245,3 +245,30 @@ void matrix3f_from_euler(matrix3f_t *mat,float roll,float pitch,float yaw)
 	mat->b.y = sr * cp;
 	mat->b.z = cr * cp;
 }
+
+void matrix3f_from_quat(matrix3f_t *mat, float q0, float q1, float q2, float q3)
+{
+	//第一行
+	mat->a.x = 1.0f - 2.0f*(q2*q2 + q3*q3);
+	mat->a.y = 2.0f*(q1*q2 - q0*q3);
+	mat->a.z = 2.0f*(q1*q3 + q0*q2);
+	//第二行
+	mat->b.x = 2.0f*(q1*q2 + q0*q3);
+	mat->b.y = 1.0f - 2.0f*(q1*q1 + q3*q3);
+	mat->b.z = 2.0f*(q2*q3 - q0*q1);
+	//第三行
+	mat->c.x = 2.0f*(q1*q3 - q0*q2);
+	mat->c.y = 2.0f*(q2*q3 + q0*q1);
+	mat->c.z = 1.0f - 2.0f*(q1*q1 + q2*q2);
+}
+void matrix3f_to_quat(matrix3f_t *mat, float *q0, float *q1, float *q2, float *q3)
+{
+	float temp;
+	*q0 = 0.5f*sqrtf(1.0f + mat->a.x + mat->b.y + mat->c.z);
+	temp = 0.25f / *q0;
+	*q1 = temp*(mat->c.y - mat->b.z);
+	*q2 = temp*(mat->a.z - mat->c.x);
+	*q3 = temp*(mat->b.x - mat->a.y);
+
+}
+
